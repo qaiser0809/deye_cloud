@@ -43,7 +43,7 @@ def get_display_name(key: str) -> str:
     return name.strip()
 
 def get_sensor_attributes(unit: str, key: str) -> dict:
-    safe_unit = unit.lower()
+    safe_unit = (unit or "").lower()
     key = key.lower()
 
     if safe_unit == "v":
