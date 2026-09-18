@@ -15,6 +15,18 @@ from .deye_api import DeyeCloudAPI
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=60)
 
+
+def _is_numeric(value) -> bool:
+    """Return True if the value can be represented as a number."""
+    if value is None:
+        return False
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
 class DeyeDataCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, api: DeyeCloudAPI):
         super().__init__(hass, _LOGGER, name="Deye Cloud Coordinator", update_interval=SCAN_INTERVAL)
@@ -27,6 +39,7 @@ class DeyeDataCoordinator(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error(f"Failed to fetch real-time data: {e}")
             return []
+
 
 class DeyeRealtimeSensor(CoordinatorEntity, RestoreEntity, SensorEntity):
     def __init__(self, coordinator, api, entry, key, unit):
@@ -46,6 +59,19 @@ class DeyeRealtimeSensor(CoordinatorEntity, RestoreEntity, SensorEntity):
         for attr_name, attr_value in sensor_attrs.items():
             setattr(self, f"_attr_{attr_name}", attr_value)
 
+        # Some API keys return non-numeric strings, such as firmware versions
+        # or serial numbers. Leaving a numeric state_class on those makes Home
+        # Assistant raise a ValueError on every coordinator update.
+        initial_value = None
+        for item in (coordinator.data or []):
+            if item.get("key") == key:
+                initial_value = item.get("value")
+                break
+
+        if not _is_numeric(initial_value):
+            self._attr_state_class = None
+            self._attr_device_class = None
+
     @property
     def native_value(self):
         for item in self.coordinator.data:
@@ -64,10 +90,11 @@ class DeyeRealtimeSensor(CoordinatorEntity, RestoreEntity, SensorEntity):
     @property
     def available(self) -> bool:
         return self.coordinator.last_update_success
-    
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry : ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     data = hass.data[DOMAIN][entry.entry_id]
@@ -86,4 +113,4 @@ async def async_setup_entry(
         if key is not None:
             sensors.append(DeyeRealtimeSensor(coordinator, api, entry, key, unit))
 
-    async_add_entities(sensors)    
+    async_add_entities(sensors)
