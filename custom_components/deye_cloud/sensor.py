@@ -71,6 +71,8 @@ class DeyeRealtimeSensor(CoordinatorEntity, RestoreEntity, SensorEntity):
         if not _is_numeric(initial_value):
             self._attr_state_class = None
             self._attr_device_class = None
+            self._attr_native_unit_of_measurement = None
+            self._attr_suggested_display_precision = None
 
     @property
     def native_value(self):
